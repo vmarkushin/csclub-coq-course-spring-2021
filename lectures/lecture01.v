@@ -37,7 +37,7 @@ Simple types
 The `Inductive` *vernacular* is used to introduce a new type into Coq.
 Let's introduce a useful Boolean type with two *constructors*:
 |*)
-Inductive bool : Type :=
+Inductive bool: Type :=
 | true
 | false.
 

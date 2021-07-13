@@ -23,7 +23,6 @@ Definition pair_inj A B (a1 a2 : A) (b1 b2 : B) :
   (a1, b1) = (a2, b2) -> (a1 = a2) /\ (b1 = b2)
 := replace_with_your_solution_here.
 
-
 (** * Exercise (optional) *)
 Definition J :
   forall (A : Type) (P : forall (x y : A), x = y -> Prop),
@@ -41,7 +40,10 @@ Definition false_eq_true_implies_False :
 (** * Exercise *)
 Definition addnS :
   forall m n, m + n.+1 = (m + n).+1
-:= replace_with_your_solution_here.
+  := fix IH m n := match m as m return (m + n.+1 = (m + n).+1) with
+                  | O => erefl
+                  | m'.+1 => _
+                  end.
 
 
 (** * Exercise *)

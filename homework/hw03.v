@@ -15,9 +15,14 @@ Section Logic.
 
 Variables A B C : Prop.
 
+Print True.
+Print conj.
+Print "<->".
+Print not.
+
 (** * Exercise *)
 Definition notTrue_iff_False : (~ True) <-> False
-:= replace_with_your_solution_here.
+  := conj (fun p => p I) (fun fp => (fun tp => fp)).
 
 (* Hint 1: use [Locate "<->".] and [Print iff.] commands to understand better
 the type above. *)
@@ -26,15 +31,16 @@ the type above. *)
 "Found a matching with no clauses on a term unknown to have an empty inductive type." try adding explicit type annotations to functional parameters or
 use `match <term> in <type> with ... end` instead of `match <term> with ... end` *)
 
+Print "~".
 
 (** * Exercise: double negation elimination works for `False` *)
 Definition dne_False : ~ ~ False -> False
-:= replace_with_your_solution_here.
+:= fun ppf : ~ ~ False => let ff := fun f: False => match f with end in ppf ff.
 
 
 (** * Exercise: double negation elimination works for `True` too. *)
 Definition dne_True : ~ ~ True -> True
-:= replace_with_your_solution_here.
+:= fun _ => I.
 
 
 (** * Exercise: Weak Peirce's law
@@ -42,7 +48,12 @@ Peirce's law (https://en.wikipedia.org/wiki/Peirce%27s_law) is equivalent to
 Double Negation Elimination (and the Law of Excluded Middle too),
 so it does not hold in general, but we can prove its weak form. *)
 Definition weak_Peirce : ((((A -> B) -> A) -> A) -> B) -> B
-:= replace_with_your_solution_here.
+  := fun abaab => let abaa :=
+                   fun aba =>
+                     let ab := fun a => abaab (fun _ => a) in
+                     aba ab in
+               abaab abaa.
+
 
 (* Hint 1: use let-in expression to break the proof into pieces and solve them independently *)
 (* Hint 2: annotate the identifiers of let-expressions with types: [let x : <type> := ... in ...] *)
@@ -51,16 +62,22 @@ Definition weak_Peirce : ((((A -> B) -> A) -> A) -> B) -> B
 Variable T : Type.
 Variable P Q : T -> Prop.
 
+Print ex_intro.
+
 (** * Exercise: existential introduction rule *)
 Definition exists_introduction :
   forall (x : T), P x -> (exists (x : T), P x)
-:= replace_with_your_solution_here.
+  := fun x : T => fun px => ex_intro P x px.
 
 (** * Exercise: Frobenius rule: existential quantifiers and conjunctions commute *)
 Definition frobenius_rule :
   (exists x, A /\ P x) <-> A /\ (exists x, P x)
-:= replace_with_your_solution_here.
-
+  := conj (fun '(ex_intro x px) => match px with
+                             | conj a b => conj a (ex_intro _ x b)
+                                end) (fun '(conj a ex) => match ex with
+                                                    | ex_intro x px => ex_intro _ x (conj a px)
+                                                       end
+                                     ).
 
 End Logic.
 
@@ -72,29 +89,36 @@ Variables A B C D : Type.
 
 (** * Exercise *)
 Definition eq1 : true = (true && true)
-:= replace_with_your_solution_here.
+:= eq_refl.
 
 (** * Exercise *)
 Definition eq2 : 42 = (if true then 21 + 21 else 239)
-:= replace_with_your_solution_here.
+:= eq_refl.
 
 (** * Exercise *)
 Definition LEM_decidable :
   forall (b : bool), b || ~~ b = true
-:= replace_with_your_solution_here.
+  := fun b => match b with
+           | false => eq_refl
+           | true => eq_refl
+           end.
 
 (** * Exercise *)
 Definition if_neg :
   forall (A : Type) (b : bool) (vT vF: A),
     (if ~~ b then vT else vF) = if b then vF else vT
-:= replace_with_your_solution_here.
+  := fun A b vT vF => match b with
+                   | false => eq_refl
+                   | true => eq_refl
+                   end.
 
 (** * Exercise : associativity of function composition *)
 (** [\o] is a notation for function composition in MathComp, prove that it's associative *)
+Print "\o".
 
 Definition compA (f : A -> B) (g : B -> C) (h : C -> D) :
-  (h \o g) \o f = h \o (g \o f)
-:= replace_with_your_solution_here.
+   (h \o g) \o f = h \o (g \o f)
+:= erefl.
 
 
 (** [=1] stands for extensional equality on unary functions,
@@ -106,7 +130,7 @@ Definition compA (f : A -> B) (g : B -> C) (h : C -> D) :
 (** * Exercise: Reflexivity *)
 Definition eqext_refl :
   forall (f : A -> B), f =1 f
-:= replace_with_your_solution_here.
+:= fun f x => erefl _.
 
 (** * Exercise: Symmetry *)
 Definition eqext_sym :

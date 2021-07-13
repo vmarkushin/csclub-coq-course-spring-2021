@@ -12,14 +12,14 @@ functions this homework asks you to implement. Please keep your code so you can
 reuse it later. *)
 
 
-(** Define is a simple language of arithmetic expressions consisting of
+  (** Define is a simple language of arithmetic expressions consisting of
 constants (natural numbers) and arbitrarily nested additions, subtractions and
 multiplications *)
 Inductive expr : Type :=
 | Const of nat
 | Plus of expr & expr
-| Minus of ...
-| Mult of ...
+| Minus of expr & expr
+| Mult of expr & expr
 .
 
 (** Let us define a special notation for our language.
@@ -45,8 +45,8 @@ Notation "x + y" := (Plus x y) (in custom expr at level 2, left associativity).
 (* Define notations for subtraction and multiplication.
    Hint: lower level means higher priority.
    Your notations should start with `in custom expr` as above. *)
-Notation "x - y" := ...
-Notation "x * y" := ...
+Notation "x - y" := (Minus x y) (in custom expr at level 2, left associativity).
+Notation "x * y" := (Mult x y) (in custom expr at level 1, left associativity).
 
 (** Here is how we write Plus (Const 0) (Plus (Const 1) (Const 2)) *)
 Check [[
@@ -59,6 +59,7 @@ Check [[
 
 (* Make sure the following are parsed as expected.
    What query can you use to do that? *)
+(* Unset Printing Notations. *)
 Check [[
           ((0 + 1) + 2) + 3
       ]].
@@ -75,8 +76,12 @@ Check [[
 (** Write an evaluator for the expression language which fixes its semantics.
 Basically, the semantics of the expression language should be the same as
 the corresponding Coq functions `addn`, `subn`, `muln`. *)
-Fixpoint eval (e : expr) : nat :=
-  ...
+Fixpoint eval (e : expr) : nat := match e with
+                                | Const n => n
+                                | Plus e1 e2 => (eval e1) + (eval e2)
+                                | Minus e1 e2 => (eval e1) - (eval e2)
+                                | Mult e1 e2 => (eval e1) * (eval e2)
+                                end.
 
 (** Some unit tests *)
 (** We haven't discussed in depth what `erefl` means yet.
@@ -87,8 +92,7 @@ Check erefl : eval [[ 0 + (2 - 1) ]] = 1.
 Check erefl : eval [[ (0 + 1) + 2 ]] = 3.
 Check erefl : eval [[ 2 + 2 * 2 ]] = 6.
 Check erefl : eval [[ (2 + 2) * 2 ]] = 8.
-...
-
+Check erefl : eval [[ (2 + 2) * 0 ]] = 0.
 
 (** * Compiling arithmetic expressions to a stack language *)
 
@@ -112,6 +116,15 @@ For example, this is one possible way to start:
 Notation " << n >> " := (Push n) (at level 0, n constr).
 *)
 
+Notation " << 'add' >> " := (Add) (at level 0).
+Notation " << 'sub' >> " := (Sub) (at level 0).
+Notation " << 'mul' >> " := (Mul) (at level 0).
+Notation " << n >> " := (Push n) (at level 0, n constr).
+
+Check << 1 >>.
+Check << add >>.
+Check << sub >>.
+Check << mul >>.
 
 (* Feel free to either define your own datatype to represent lists or reuse the
 `seq` datatype provided by Mathcomp (this is why this file imports the `seq`
@@ -137,32 +150,78 @@ And the type of stacks like so:
 *)
 
 
+Definition prog := seq instr.
+Definition stack := seq nat.
+
 (** The [run] function is an interpreter for the stack language. It takes a
  program (list of instructions) and the current stack, and processes the program
  instruction-by-instruction, returning the final stack. *)
 Fixpoint run (p : prog) (s : stack) : stack :=
-  ...
+  match p with
+  | [::] => s
+  | (Push n) :: xs => run xs (n :: s)
+  | Add :: xs => let
+                  s' := match s with
+                        | (x1 :: (x2 :: xs')) => (x1 + x2) :: xs'
+                        | _ => s
+                        end
+                  in run xs s'
+
+  | Sub :: xs => let s' := match s with
+               | (x1 :: (x2 :: xs')) => (x1 - x2) :: xs'
+               | _ => s
+                         end
+                in run xs s'
+  | Mul :: xs => let s' := match s with
+               | (x1 :: (x2 :: xs')) => (x1 * x2) :: xs'
+               | _ => s
+                         end
+                in run xs s'
+  end.
 
 (** Unit tests: *)
 Check erefl :
-  run [:: ... stack-program ...] [::] = [:: ... stack-of-numbers ...].
-...
+  run [:: << 1 >>] [::] = [:: 1].
+
+Check erefl :
+  run [:: << 1 >>; << 2 >>; << 3 >>; << mul >>; << add >>] [::] = [:: 7].
+Check erefl :
+  run [:: << 1 >>; << 2 >>; << 3 >>; << mul >>; << sub >>] [::] = [:: 5].
+Check erefl :
+  run [:: << 1 >>; << 2 >>; << mul >>; << sub >>] [::] = [:: 2].
+Check erefl :
+  run [:: << 1 >>; << 2 >>] [::] = [:: 2; 1].
+Check erefl :
+  run [:: << 4 >>; << 2 >>; << 3 >>; << add >>; << mul >>] [::] = [:: 20].
+Check erefl :
+  run [:: << 3 >>; << 6 >>; << sub >>; << 4 >> ; << mul >>] [::] = [:: 12].
 
 
 (** Now, implement a compiler from "high-level" expressions to "low-level" stack
 programs and do some unit tests. *)
 Fixpoint compile (e : expr) : prog :=
-  ...
+  match e with
+  | Const n => << n >> :: [::]
+  | Plus m n => (compile n ++ compile m) ++ (<< add >> :: [::])
+  | Minus m n => (compile n ++ compile m) ++ (<< sub >> :: [::])
+  | Mult m n => (compile n ++ compile m) ++ (<< mul >> :: [::])
+  end.
 
+(* 4 2 3+ * *)
 (** Do some unit tests *)
+Compute compile [[ (2 + 3) * 4 ]].
 Check erefl :
-  compile [[ ... expression ... ]] = [:: ... stack-program ].
-...
+  compile [[ (2 + 3) * 4 ]] = [:: << 4 >>; << 3 >>; << 2 >>; << add >>; << mul >> ].
+Check erefl :
+  compile [[ (6 - 3) * 4 ]] = [:: << 4 >>; << 3 >>; << 6 >>; << sub >>; << mul >> ].
+
 (* Some ideas for unit tests:
   - check that `run (compile e) [::] = [:: eval e]`, where `e` is an arbitrary expression;
   - check that `compile` is an injective function
-*)
+ *)
 
+Check erefl : run (compile [[ (2 + 3) * 4 ]]) [::] = [:: eval [[ (2 + 3) * 4 ]]].
+Check erefl : run (compile [[ (2 + 3) * (4 - 1) ]]) [::] = [:: eval [[ (2 + 3) * (4 - 1) ]]].
 
 (** Optional exercise: decompiler *)
 
@@ -170,14 +229,48 @@ Check erefl :
 expression *)
 (* Hint: you might want to introduce a recursive helper function `decompile'` to
  reuse it for `decompile`. *)
-Definition decompile (p : prog) : option expr :=
-  ...
+
+Definition opt_bind { a : Type } (f: a -> option a) (m : option a) : option a :=
+  match m with
+  | Some x => f x
+  | None => None
+  end.
+
+Fixpoint decompile' (p : prog) (es : option (seq expr)) : option (seq expr) :=
+  match p with
+  | [::] => es
+  | (Push n) :: xs => opt_bind (fun es' => decompile' xs (Some ((Const n) :: es'))) es
+  | Add :: xs => opt_bind (fun es' =>
+                           let
+                  es'' := match es' with
+                        | (x1 :: (x2 :: xs')) => Some ((Plus x1 x2) :: xs')
+                        | _ => None
+                        end
+                    in
+                   decompile' xs es''
+                ) es
+  | Sub :: xs => opt_bind (fun es' =>
+                           let es'' := match es' with
+               | (x1 :: (x2 :: xs')) => Some ((Minus x1 x2) :: xs')
+               | _ => None
+               end
+               in decompile' xs es'') es
+  | Mul :: xs => opt_bind (fun es' => let es'' := match es' with
+               | (x1 :: (x2 :: xs')) => Some ((Mult x1 x2) :: xs')
+               | _ => None
+               end
+               in decompile' xs es'') es
+  end.
+
+Definition decompile (p : prog) : option expr := match (decompile' p (Some [::])) with
+                                                 | Some [:: x] => Some x
+                                                 | _ => None
+                                                 end.
 
 (** Unit tests *)
-Check erefl :
-  decompile [:: ... stack-program ] = some [[ expression ]].
-...
-
-(* Some ideas for unit tests:
-  - check that `decompile (compile e) = Some e`, where `e` is an arbitrary expression
-*)
+Check erefl : decompile [:: << 4 >>; << 3 >>; << 2 >>; << add >>; << mul >> ] = Some [[ (2 + 3) * 4 ]].
+Check erefl : decompile [::<< 3 >>; << 2 >>; << add >>;  << 4 >>; << mul >> ] = Some [[ 4 * (2 + 3) ]].
+Check erefl : decompile [:: << 4 >>; << 3 >>; << 2 >>; << add >>; << mul >>; << mul >> ] = None.
+Check erefl : decompile [:: << 4 >>; << 3 >>; << 2 >>; << add >> ] = None.
+Check erefl : decompile [:: << 4 >>; << 3 >> ] = None.
+Check erefl : decompile [:: << 4 >> ] = Some [[ 4 ]].
